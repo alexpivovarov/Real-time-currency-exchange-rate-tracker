@@ -1,0 +1,24 @@
+plugins {
+    id "java"
+    id "application"
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation "com.sparkjava:spark-core:2.9.4" // SparkJava for REST API
+    implementation "redis.clients:jedis5.1.0" // Jedis Redis client
+    implementation "com.google.code.gson:gson:2.10.1" // Gson fro JSON parsing
+
+}
+
+application {
+    mainClass = "com.example.exchange.ExchangeRateApp"
+}
