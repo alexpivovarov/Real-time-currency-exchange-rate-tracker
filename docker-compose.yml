@@ -1,0 +1,23 @@
+version: "3.8"
+
+services:
+  app: # Defines Java app container
+    build: # Docker builds from Dockerfile
+    ports:
+      - "4567:4567" # Maps container's port 4567 (SparkJava) to browser
+    depends_on: # Tells Docker to start Redis 
+      - redis
+    environment:
+      - REDIS_HOST=redis # Let your app talk to Redis by name
+    networks: # Connects both containers so they can talk
+      - app-network
+  
+  redis:
+    image: redis:7.2-alpine # Lightweight Redis image
+    ports:
+    - "6379:6379"
+    networks:
+    - app-network
+
+  networks:
+    app-network: 
