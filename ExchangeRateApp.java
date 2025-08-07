@@ -5,7 +5,7 @@ package com.example.exchange;
 import com.example.exchange.service.ExchangeRateService;
 
 import java.util.Timer;
-import java.util.TimerTask
+import java.util.TimerTask;
 
 import static spark.Spark.*;
 
@@ -38,7 +38,7 @@ public class ExchangeRateApp {
             }
 
             // Get rate from Redis
-            String rate = service.getRate(from.toUpperCase(), to.UpperCase());
+            String rate = service.getRate(from.toUpperCase(), to.toUpperCase());
             return rate != null ? rate : "Rate not found";
         });
 
@@ -68,13 +68,14 @@ public class ExchangeRateApp {
                 }
 
                 // Return the result of the conversion in a nicely fromatted string
-                return String.format("%.2f %s = %.2f %s", amount, from.toUppercase(), result, to.toUpperCase());
+                return String.format("%.2f %s = %.2f %s", amount, from.toUpperCase(), result, to.toUpperCase());
             } catch (NumberFormatException e) {
                 res.status(400);
-                return "Invalid amount format"
+                return "Invalid amount format";
             }
         });
         
-        System.out.println("Exchange rate tracker started.") // Confirms the app is running
+        System.out.println("Exchange rate tracker started."); // Confirms the app is running
     }
 }
+
