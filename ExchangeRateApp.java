@@ -1,81 +1,73 @@
-// Entry point of the programm
+package com.example.exchange.service;
 
-package com.example.exchange;
+import com.example.exchange.util.RedisClient;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
-import com.example.exchange.service.ExchangeRateService;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 
-import java.util.Timer;
-import java.util.TimerTask;
+public class ExchangeRateService {
 
-import static spark.Spark.*;
+    private final RedisClient cache = new RedisClient();
 
+    public void fetchAndStore() {
+        // NOTE: Replace with your real endpoint + API key if needed.
+        // For demo, we use a free endpoint that returns a tiny JSON.
+        String apiUrl = "https://api.frankfurter.app/latest?from=USD&to=EUR,GBP";;
 
-public class ExchangeRateApp {
-    public static void main(String[] args) {
-        ExchangeRateService service = new ExchangeRateService(); // creates the object that will handle fetching exchange rates
+        try {
+            URL url = new URL(apiUrl);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
 
-        // Set up a background job to fetch rates every 5 minutes
-        Timer timer = new Timer(); // Java's built-in scheduler
-        timer.scheduleAtFixedRate(new TimerTask() {
-            public void run() {
-                service.fetchAndCacheRates(); // Fetch from API and cache in Redis
-            }
-        }, 0, 5 * 60 * 1000); // Runs every 5 minutes
+            conn.setRequestMethod("GET");
 
-        // Rest API endpoints
-        // Check if server is running
-        get("/ping", (req, res) ->"Exchange Rate Tracker is running!");
+            System.out.println("[HTTP] " + conn.getRequestMethod() + " " + url);
+            int code = conn.getResponseCode();
+            System.out.println("[HTTP] Response code: " + code);
 
-        // Get current exchange rate (e.g., /rate?from=USD&to=EUR)
-        get("/rate", (req, res) -> {
-            String from = req.queryParams("from");
-            String to = req.queryParams("to");
-
-            // Validate input
-            if (from == null || to == null) {
-                res.status(400);
-                return "Missing parameters: from or to";
+            if (code != 200) {
+                System.err.println("[HTTP] Non-OK status, aborting fetch.");
+                return;
             }
 
-            // Get rate from Redis
-            String rate = service.getRate(from.toUpperCase(), to.toUpperCase());
-            return rate != null ? rate : "Rate not found";
-        });
-
-        // Convert an amount between currencies (e.g. /convert?from=USD&to=EUR&amount=100)
-        get("/convert", (req, res) -> {
-            String from = req.queryParams("from");
-            String to = req.queryParams("to");
-            String amountStr = req.queryParams("amount");
-
-            // Validate input
-            if (from == null || to == null || amountStr == null) {
-                res.status(404); // Bad Request
-                return "Missing parameters: from, to, or amount";
-            }
-
-            try {
-                // Try to parse the input amount (e.g. "100") into a double
-                double amount = Double.parseDouble(amountStr);
-
-                // Call the service to convert the amount from one currency to another
-                double result = service.convert(from.toUpperCase(), to.toUppercase(), amount);
-
-                // If the rate was not found in Redis (returns -1), respond with 404 error
-                if (result == -1) {
-                    res.status(404); // HTTP 404 noit found
-                    return "Exchange rate not found";
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    sb.append(line);
                 }
+                String json = sb.toString();
+                System.out.println("[HTTP] Payload: " + (json.length() > 200 ? json.substring(0, 200) + "..." : json));
 
-                // Return the result of the conversion in a nicely fromatted string
-                return String.format("%.2f %s = %.2f %s", amount, from.toUpperCase(), result, to.toUpperCase());
-            } catch (NumberFormatException e) {
-                res.status(400);
-                return "Invalid amount format";
+                JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+                JsonObject rates = root.getAsJsonObject("rates");
+                if (rates != null) {
+                    if (rates.has("EUR")) {
+                        String v = rates.get("EUR").getAsString();
+                        cache.setRate("USD_EUR", v);
+                        System.out.println("[CACHE] USD_EUR=" + v);
+                    }
+                    if (rates.has("GBP")) {
+                        String v = rates.get("GBP").getAsString();
+                        cache.setRate("USD_GBP", v);
+                        System.out.println("[CACHE] USD_GBP=" + v);
+                    }
+                }
             }
-        });
-        
-        System.out.println("Exchange rate tracker started."); // Confirms the app is running
+        } catch (IOException ex) {
+            System.err.println("[ERROR] fetchAndStore failed: " + ex.getMessage());
+        }
+    }
+
+    public String getFromCache(String key) {
+        return cache.getRate(key);
     }
 }
+
 
