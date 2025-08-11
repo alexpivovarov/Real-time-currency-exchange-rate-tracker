@@ -1,73 +1,37 @@
-package com.example.exchange.service;
+package com.example.exchange;
 
-import com.example.exchange.util.RedisClient;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import com.example.exchange.service.ExchangeRateService;
+import static spark.Spark.*;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
+public class ExchangeRateApp {
+    public static void main(String[] args) {
+        port(4567);
 
-public class ExchangeRateService {
+        ExchangeRateService service = new ExchangeRateService();
 
-    private final RedisClient cache = new RedisClient();
+        // Health
+        get("/health", (req, res) -> "ok");
 
-    public void fetchAndStore() {
-        // NOTE: Replace with your real endpoint + API key if needed.
-        // For demo, we use a free endpoint that returns a tiny JSON.
-        String apiUrl = "https://api.frankfurter.app/latest?from=USD&to=EUR,GBP";;
+        // Trigger fetch (manual)
+        post("/fetch", (req, res) -> {
+            service.fetchAndStore();
+            return "fetched";
+        });
 
-        try {
-            URL url = new URL(apiUrl);
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-
-            conn.setRequestMethod("GET");
-
-            System.out.println("[HTTP] " + conn.getRequestMethod() + " " + url);
-            int code = conn.getResponseCode();
-            System.out.println("[HTTP] Response code: " + code);
-
-            if (code != 200) {
-                System.err.println("[HTTP] Non-OK status, aborting fetch.");
-                return;
+        // Read a rate by key, e.g. USD_EUR
+        get("/rate/:pair", (req, res) -> {
+            String pair = req.params(":pair");
+            String value = service.getFromCache(pair);
+            if (value == null) {
+                res.status(404);
+                return "not found";
             }
+            return value;
+        });
 
-            try (BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
-                StringBuilder sb = new StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    sb.append(line);
-                }
-                String json = sb.toString();
-                System.out.println("[HTTP] Payload: " + (json.length() > 200 ? json.substring(0, 200) + "..." : json));
-
-                JsonObject root = JsonParser.parseString(json).getAsJsonObject();
-                JsonObject rates = root.getAsJsonObject("rates");
-                if (rates != null) {
-                    if (rates.has("EUR")) {
-                        String v = rates.get("EUR").getAsString();
-                        cache.setRate("USD_EUR", v);
-                        System.out.println("[CACHE] USD_EUR=" + v);
-                    }
-                    if (rates.has("GBP")) {
-                        String v = rates.get("GBP").getAsString();
-                        cache.setRate("USD_GBP", v);
-                        System.out.println("[CACHE] USD_GBP=" + v);
-                    }
-                }
-            }
-        } catch (IOException ex) {
-            System.err.println("[ERROR] fetchAndStore failed: " + ex.getMessage());
-        }
-    }
-
-    public String getFromCache(String key) {
-        return cache.getRate(key);
+        System.out.println("[APP] Started on http://localhost:4567");
     }
 }
+
 
 
