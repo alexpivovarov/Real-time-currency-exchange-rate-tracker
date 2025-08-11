@@ -1,69 +1,76 @@
 // fetching and caching logic 
-
 package com.example.exchange.service;
 
 import com.example.exchange.util.RedisClient;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser
+import com.google.gson.JsonParser;
 
+import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
-import java.math.BigDecimal;
 import java.net.HttpURLConnection;
-import java.net.URL
-import java.net.Map
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 
 public class ExchangeRateService {
-    private final RedisClient redis;
 
-    // API URL to fetch exchange rates (base currency: USD)
-    private static final String API_URL = "https://api.exchangerate.host/latest?base=USD";  // calling public API
+    private final RedisClient cache = new RedisClient();
 
-    public ExchangeRateService() {
-        this.redis = new RedisClient();     //connects to Redis
-    }
+    public void fetchAndStore() {
+        // NOTE: Replace with your real endpoint + API key if needed.
+        // For demo, we use a free endpoint that returns a tiny JSON.
+        String apiUrl = "https://api.frankfurter.app/latest?from=USD&to=EUR,GBP";;
 
-    // Fetch rates from API and store them in Redis
-    public void fetchAndCacheRates() {
         try {
-            // Open connection to API
-            URL url = new URL(API_URL);
+            URL url = new URL(apiUrl);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("Get");
 
-            // Parse the Json response using Gson
-            JsonObject json = JsonParser.parseReader(new InputStreamReader(conn.getInputStream())).getAsJsonObject();   //Parsing the JSON
-            JsonObject rates = json.getAsJsonObject("rates");
+            conn.setRequestMethod("GET");
 
-            // Store each rate in Redis with key: USD_<currency>
-            for (Map.Entry<String, JsonElement> entry : rates.entrySet()) {
-                String currency = entry.getKey();   // e.g. "EUR"
-                BigDecimal rate = entry.getValue().getAsBigDecimal();   //e.g., 0.893   //Looping over currency rates
-                redis.set("USD_" + currency, rate.toString());  // Storing each pair to Redis
+            System.out.println("[HTTP] " + conn.getRequestMethod() + " " + url);
+            int code = conn.getResponseCode();
+            System.out.println("[HTTP] Response code: " + code);
 
+            if (code != 200) {
+                System.err.println("[HTTP] Non-OK status, aborting fetch.");
+                return;
             }
 
-            System.out.println("Exchange rates updated and cached in Redis.");
-        } catch (Exception e) {
-            e.printStackTrace();
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    sb.append(line);
+                }
+                String json = sb.toString();
+                System.out.println("[HTTP] Payload: " + (json.length() > 200 ? json.substring(0, 200) + "..." : json));
+
+                JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+                JsonObject rates = root.getAsJsonObject("rates");
+                if (rates != null) {
+                    if (rates.has("EUR")) {
+                        String v = rates.get("EUR").getAsString();
+                        cache.setRate("USD_EUR", v);
+                        System.out.println("[CACHE] USD_EUR=" + v);
+                    }
+                    if (rates.has("GBP")) {
+                        String v = rates.get("GBP").getAsString();
+                        cache.setRate("USD_GBP", v);
+                        System.out.println("[CACHE] USD_GBP=" + v);
+                    }
+                }
+            }
+        } catch (IOException ex) {
+            System.err.println("[ERROR] fetchAndStore failed: " + ex.getMessage());
         }
     }
 
-    // Get the exchange rate from Redis
-    public String getRate(String from, String to) {
-        String key = from.Uppercase() + "_" + to.UpperCase(); // e.g., USD_EUR
-        return redis.get(key); // Return the stored rate
+    public String getFromCache(String key) {
+        return cache.getRate(key);
     }
-
-    // Convert an amount from one currency to another using stored rates
-    public double convert(String from, String to, double amount) {
-        String rateStr = getRate(from, to);
-        if (rateStr == null) return -1 // Return -1 if rate not found
-
-        double rate = Double.parseDouble(rateStr);
-        return amount * rate; // Return converted value
-    }
-
-
 }
+
+
 
 
