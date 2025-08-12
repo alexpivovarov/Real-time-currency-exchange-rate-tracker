@@ -1,0 +1,16 @@
+# Gradle / build
+.gradle/
+build/
+out/
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+
+# Logs & temp
+*.log
+*.zip
+
+# (optional) env files for secrets if you add them later
+.env
