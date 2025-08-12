@@ -1,20 +1,18 @@
-# Use OpenJDK 17 as base image
-FROM openjdk:17-jdk
+# Build stage
+FROM gradle:8.10.2-jdk17 AS build
+WORKDIR /app
+COPY build.gradle settings.gradle ./
+COPY src ./src
+RUN gradle --no-daemon clean shadowJar -x test
 
-# Set working directory inside container
-WORKDIR /app 
+# Run stage
+FROM eclipse-temurin:17-jre
+WORKDIR /app
+COPY --from=build /app/build/libs/*-all.jar app.jar
+EXPOSE 4567
+ENV JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+CMD ["java","-jar","/app/app.jar"]
 
-# Copy all project files into the container
-COPY . .
-
-# Give permission to Gradle wrapper to run (only needed on Linux)
-RUN chmod +x ./gradlew
-
-# Build the application using Gradle
-RUN ./gradlew Build
-
-# Set the default command to run the app
-CMD ["java", "-cp", "build/classes/java/main", "com.example.exchange.ExchangeRateApp"]
 
 
 
