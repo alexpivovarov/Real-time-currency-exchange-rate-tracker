@@ -2,6 +2,7 @@ plugins {
     id "java"
     id "groovy"
     id "application"
+     id 'com.github.johnrengelman.shadow' version '8.1.1'
 }
 
 java {
