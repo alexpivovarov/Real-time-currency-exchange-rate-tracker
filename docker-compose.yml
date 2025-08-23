@@ -1,19 +1,27 @@
 services:
-  app:
-    build: .
+  quote-service:
+    image: fx/quote-service:dev
+    build:
+      context: .
+      dockerfile: quote-service/Dockerfile
     ports:
-      - "4567:4567"
-    environment:
-      - REDIS_HOST=redis
+      - "8081:8081"
+
+  order-service:
+    image: fx/order-service:dev
+    build:
+      context: .
+      dockerfile: order-service/Dockerfile
+    ports:
+      - "8082:8082"
+
+  gateway:
+    image: fx/gateway:dev
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    ports:
+      - "8080:8080"
     depends_on:
-      - redis
-
-  redis:
-    image: redis:7.2-alpine
-    ports:
-      - "6379:6379"
-
-
-  networks:
-
-    app-network: 
+      - quote-service
+      - order-service
