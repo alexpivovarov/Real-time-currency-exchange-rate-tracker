@@ -1,36 +1,28 @@
-Real-Time Currency Exchange Rate Tracker
+# Real-Time Currency Exchange Rate Tracker
 
-Java 17 + SparkJava REST API, Redis cache, Docker & Docker Compose. Tests with Spock (Groovy).  
+A lightweight REST API built with **Java 17 + SparkJava**, using **Redis** for caching and **Docker Compose** for deployment.  
+Fetches and serves real-time USD↔EUR and USD↔GBP exchange rates from [Frankfurter.app](https://www.frankfurter.app).
 
-What it does
- • Fetches live USD→EUR & USD→GBP from Frankfurter and caches them in Redis.
- • Derives cross pairs: EUR_USD, GBP_USD, EUR_GBP, GBP_EUR.
- • Runs fully in Docker/Compose.  
+---
 
-Endpoints
- • GET  /health → ok
- • POST /fetch → fetch & cache latest rates
- • GET  /rate/{PAIR} → returns a rate as text
-Examples: USD_EUR, USD_GBP, EUR_USD, GBP_USD, EUR_GBP, GBP_EUR
+## Features
+- Fetches **live USD→EUR** and **USD→GBP** rates from Frankfurter.
+- **Caches results** in Redis for faster access.
+- Automatically **derives cross pairs**:  
+  `EUR_USD`, `GBP_USD`, `EUR_GBP`, `GBP_EUR`.
+- Runs fully containerized via **Docker Compose**.
 
-We query https://api.frankfurter.app/latest?from=USD&to=EUR,GBP once; GBP pairs are derived from those two base rates.
+---
 
-Quick start (Docker)
+## Endpoints
+| Method | Endpoint | Description |
+|--------|-----------|-------------|
+| `GET`  | `/health` | Returns `ok` if the service is healthy. |
+| `POST` | `/fetch`  | Fetches and caches the latest rates. |
+| `GET`  | `/rate/{PAIR}` | Returns the exchange rate (e.g. `USD_EUR`, `EUR_GBP`). |
 
-docker compose up -d --build
-curl.exe -s http://127.0.0.1:4567/health
-curl.exe -s -X POST http://127.0.0.1:4567/fetch
-curl.exe -s http://127.0.0.1:4567/rate/USD_EUR
+Example:
+```bash
+curl -s -X POST http://127.0.0.1:4567/fetch
+curl -s http://127.0.0.1:4567/rate/USD_EUR
 
-Tip (Windows): use curl.exe. PowerShell’s curl alias doesn’t support -X POST.
-
-Config
- • REDIS_HOST (set to redis in docker-compose.yml)
-
-Tests (optional)
-
-Spock/Groovy tests are included; run locally with:
-
-gradle test
-
-(Docker build skips tests by default.)  
